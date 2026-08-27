@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enterprise AI Workflow Platform</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 20% 20%, #1a1035 0%, #0a0a14 45%, #050508 100%);
+    color: #e8e8f0;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* animated glow orbs in background */
+  body::before, body::after {
+    content: "";
+    position: fixed;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.35;
+    z-index: 0;
+    animation: drift 18s ease-in-out infinite alternate;
+  }
+  body::before { background: #7c3aed; top: -100px; left: -100px; }
+  body::after { background: #06b6d4; bottom: -150px; right: -100px; animation-delay: 4s; }
+
+  @keyframes drift {
+    0% { transform: translate(0,0) scale(1); }
+    100% { transform: translate(60px, 40px) scale(1.15); }
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 20px 100px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  header h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, #a78bfa, #22d3ee, #a78bfa);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shine 4s linear infinite;
+  }
+  @keyframes shine { to { background-position: 200% center; } }
+
+  header p { color: #9d9db0; font-size: 0.85rem; margin-top: 6px; }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: rgba(34,211,238,0.08);
+    border: 1px solid rgba(34,211,238,0.3);
+    font-size: 0.75rem;
+    color: #67e8f9;
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #22d3ee;
+    box-shadow: 0 0 8px #22d3ee;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  /* upload zone */
+  .upload-zone {
+    background: rgba(255,255,255,0.03);
+    border: 1.5px dashed rgba(167,139,250,0.35);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    margin-bottom: 20px;
+    backdrop-filter: blur(10px);
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: #a78bfa;
+    background: rgba(167,139,250,0.07);
+    box-shadow: 0 0 25px rgba(124,58,237,0.15);
+  }
+  .upload-zone p { font-size: 0.85rem; color: #b8b8cc; }
+  .upload-zone .icon { font-size: 1.6rem; margin-bottom: 6px; }
+  #fileInput { display: none; }
+
+  .upload-status {
+    font-size: 0.78rem;
+    color: #67e8f9;
+    margin-top: 10px;
+    min-height: 18px;
+  }
+
+  /* chat area */
+  .chat-window {
+    flex: 1;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    backdrop-filter: blur(14px);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    max-height: 55vh;
+    min-height: 300px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  }
+
+  .msg {
+    max-width: 78%;
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    animation: rise 0.3s ease;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .msg.user {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #7c3aed, #5b21b6);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.bot {
+    align-self: flex-start;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-bottom-left-radius: 4px;
+  }
+  .msg .route-tag {
+    display: block;
+    font-size: 0.65rem;
+    opacity: 0.55;
+    margin-top: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .typing {
+    align-self: flex-start;
+    display: flex;
+    gap: 4px;
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 16px;
+    border-bottom-left-radius: 4px;
+  }
+  .typing span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #a78bfa;
+    animation: bounce 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }
+
+  /* input bar */
+  .input-bar {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+  }
+  .input-bar input {
+    flex: 1;
+    padding: 14px 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: #e8e8f0;
+    font-size: 0.92rem;
+    outline: none;
+    transition: border 0.2s ease, box-shadow 0.2s ease;
+  }
+  .input-bar input:focus {
+    border-color: #a78bfa;
+    box-shadow: 0 0 0 3px rgba(167,139,250,0.15);
+  }
+  .input-bar button {
+    padding: 0 22px;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #7c3aed, #06b6d4);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .input-bar button:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(124,58,237,0.4); }
+  .input-bar button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.3); border-radius: 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>⚡ Enterprise AI Workflow Platform</h1>
+    <p>LangGraph agent · MCP tools · RAG over Qdrant · Groq inference</p>
+    <div class="status-pill"><span class="status-dot"></span> Live</div>
+  </header>
+
+  <div class="upload-zone" id="uploadZone">
+    <div class="icon">📄</div>
+    <p><strong>Drop a document</strong> or click to upload — it becomes searchable instantly</p>
+    <input type="file" id="fileInput" accept=".txt,.md">
+    <div class="upload-status" id="uploadStatus"></div>
+  </div>
+
+  <div class="chat-window" id="chatWindow">
+    <div class="msg bot">👋 Hi! Ask me anything — I can look up documents, check report statuses, or just chat.</div>
+  </div>
+
+  <div class="input-bar">
+    <input type="text" id="messageInput" placeholder="Ask about leave policy, remote work, report status..." />
+    <button id="sendBtn">Send</button>
+  </div>
+</div>
+
+<script>
+  const chatWindow = document.getElementById('chatWindow');
+  const messageInput = document.getElementById('messageInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput = document.getElementById('fileInput');
+  const uploadStatus = document.getElementById('uploadStatus');
+
+  const userId = 'web-user';
+  const threadId = 'web-thread-' + Date.now();
+
+  function addMessage(text, sender, route) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + sender;
+    div.innerHTML = text + (route ? `<span class="route-tag">${route}</span>` : '');
+    chatWindow.appendChild(div);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+
+  function showTyping() {
+    const div = document.createElement('div');
+    div.className = 'typing';
+    div.id = 'typingIndicator';
+    div.innerHTML = '<span></span><span></span><span></span>';
+    chatWindow.appendChild(div);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+
+  function hideTyping() {
+    const el = document.getElementById('typingIndicator');
+    if (el) el.remove();
+  }
+
+  async function sendMessage() {
+    const text = messageInput.value.trim();
+    if (!text) return;
+
+    addMessage(text, 'user');
+    messageInput.value = '';
+    sendBtn.disabled = true;
+    showTyping();
+
+    try {
+      const res = await fetch('/workflow/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, user_id: userId, thread_id: threadId })
+      });
+      const data = await res.json();
+      hideTyping();
+      addMessage(data.response, 'bot', data.route);
+    } catch (err) {
+      hideTyping();
+      addMessage('⚠️ Error reaching the server: ' + err.message, 'bot');
+    }
+    sendBtn.disabled = false;
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  messageInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+  // upload handling
+  uploadZone.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) uploadFile(fileInput.files[0]);
+  });
+
+  async function uploadFile(file) {
+    uploadStatus.textContent = `Uploading ${file.name}...`;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/documents/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      uploadStatus.textContent = `✅ ${data.filename} — ${data.chunks_ingested} chunk(s) indexed and searchable`;
+    } catch (err) {
+      uploadStatus.textContent = `⚠️ Upload failed: ${err.message}`;
+    }
+  }
+</script>
+</body>
+</html>
