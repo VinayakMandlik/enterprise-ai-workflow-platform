@@ -4,6 +4,7 @@ discovers whatever tools it exposes, and wraps them as LangChain tools
 that a LangGraph agent can call.
 """
 import asyncio
+import os
 from contextlib import AsyncExitStack
 
 from mcp import ClientSession, StdioServerParameters
@@ -14,7 +15,9 @@ from langchain_core.tools import StructuredTool
 class MCPToolRegistry:
     def __init__(self, server_module: str = "app.mcp.tool_server"):
         self._server_params = StdioServerParameters(
-            command="python", args=["-m", server_module]
+            command="python",
+            args=["-m", server_module],
+            env=dict(os.environ),  # explicitly pass all env vars to the subprocess
         )
         self._stack: AsyncExitStack | None = None
         self._session: ClientSession | None = None
