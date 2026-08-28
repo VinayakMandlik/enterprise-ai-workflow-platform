@@ -47,11 +47,11 @@ def get_llm(temperature: float = 0.0) -> BaseChatModel:
 
 def get_embeddings() -> Embeddings:
     """
-    Runs a local embedding model (downloads once, then fully offline).
-    This avoids Hugging Face's Inference API permission restrictions
-    entirely, and has zero rate limits since it runs on your own CPU.
+    Uses fastembed (ONNX Runtime based) instead of sentence-transformers
+    (PyTorch based) — dramatically lighter memory footprint, critical
+    for running on memory-constrained free-tier hosting like Render.
     """
-    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_community.embeddings import FastEmbedEmbeddings
 
     settings = get_settings()
-    return HuggingFaceEmbeddings(model_name=settings.huggingface_embedding_model)
+    return FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")

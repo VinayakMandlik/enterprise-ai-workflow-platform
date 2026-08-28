@@ -13,11 +13,12 @@ langgraph>=0.2
 # Vector store
 langchain-qdrant>=0.2
 qdrant-client>=1.11
+langchain-community>=0.3
 
 # MCP (Model Context Protocol)
 mcp<2
 
 # Tracing
 langsmith>=0.1
-sentence-transformers>=3.0
+fastembed>=0.4
 boto3>=1.35
