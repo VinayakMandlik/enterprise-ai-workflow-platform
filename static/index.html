@@ -107,7 +107,7 @@
     max-height: 260px;
     overflow-y: auto;
   }
-  .doc-item {
+    .doc-item {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -118,6 +118,18 @@
     color: #cbd5e1;
     border: 1px solid rgba(255,255,255,0.06);
   }
+  .doc-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .delete-doc-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.5;
+    font-size: 0.75rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+  }
+  .delete-doc-btn:hover { opacity: 1; background: rgba(248,113,113,0.15); }
   .doc-item .dot { color: #34d399; }
 
   .clear-btn {
@@ -292,7 +304,7 @@
     <div class="upload-zone" id="uploadZone">
       <div class="icon">⬆️</div>
       <p><strong>Drop a document</strong> or click to upload</p>
-      <input type="file" id="fileInput" accept=".txt,.md">
+      <input type="file" id="fileInput" accept=".txt,.md,.pdf">
     </div>
     <div class="upload-status" id="uploadStatus"></div>
     <div class="doc-list" id="docList"></div>
@@ -468,10 +480,31 @@
       const data = await res.json();
       docList.innerHTML = data.documents.map(d => {
         const name = d.replace('documents/', '');
-        return `<div class="doc-item"><span class="dot">●</span> ${name}</div>`;
+        return `
+          <div class="doc-item">
+            <span class="dot">●</span>
+            <span class="doc-name">${name}</span>
+            <button class="delete-doc-btn" data-name="${name}">🗑️</button>
+          </div>`;
       }).join('') || '<div class="doc-item" style="opacity:0.5">No documents yet</div>';
+
+      // wire up delete buttons after rendering
+      document.querySelectorAll('.delete-doc-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteDocument(btn.dataset.name));
+      });
     } catch (err) {
       docList.innerHTML = '<div class="doc-item" style="opacity:0.5">Could not load documents</div>';
+    }
+  }
+
+  async function deleteDocument(filename) {
+    if (!confirm(`Delete "${filename}"? This removes it from storage and search.`)) return;
+
+    try {
+      await fetch(`/documents/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+      loadDocuments();
+    } catch (err) {
+      alert('Failed to delete: ' + err.message);
     }
   }
 

@@ -69,6 +69,15 @@ def ingest_text(text: str, source_name: str) -> int:
     store.add_documents(docs)
     return len(docs)
 
+    
+def extract_pdf_text(file_bytes: bytes) -> str:
+    """Extracts all text from a PDF's raw bytes."""
+    from pypdf import PdfReader
+    from io import BytesIO
+
+    reader = PdfReader(BytesIO(file_bytes))
+    return "\n\n".join(page.extract_text() or "" for page in reader.pages)
+
 
 if __name__ == "__main__":
     count = ingest_directory()

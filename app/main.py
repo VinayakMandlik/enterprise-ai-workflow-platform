@@ -4,18 +4,19 @@ FastAPI entrypoint.
 Run with:  uvicorn app.main:app --reload
 """
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
 
 from app.mcp.tool_client import load_mcp_tools
 from app.agents.graph import build_graph
 from app.memory.long_term import get_long_term_memory
+from app.storage.s3_client import upload_document, list_documents, delete_document
+from app.rag.ingest import ingest_text, extract_pdf_text
+from app.rag.vector_store import delete_by_source
 
-from fastapi import UploadFile, File
-from app.storage.s3_client import upload_document, list_documents
-from app.rag.ingest import ingest_text
-from fastapi.staticfiles import StaticFiles
 _state = {}
 
 
@@ -48,11 +49,12 @@ class WorkflowResponse(BaseModel):
     response: str
     route: str
 
-from fastapi.responses import FileResponse
 
 @app.get("/")
 async def serve_frontend():
     return FileResponse("static/index.html")
+
+
 @app.post("/workflow/run", response_model=WorkflowResponse)
 async def run_workflow(req: WorkflowRequest):
     graph = _state["graph"]
@@ -76,6 +78,7 @@ async def get_memory(user_id: str):
 async def health():
     return {"status": "ok"}
 
+
 @app.post("/documents/upload")
 async def upload_document_endpoint(file: UploadFile = File(...)):
     contents = await file.read()
@@ -83,8 +86,12 @@ async def upload_document_endpoint(file: UploadFile = File(...)):
     # 1. Store the raw file in cloud storage (Supabase, S3-compatible)
     storage_key = upload_document(contents, file.filename)
 
-    # 2. Decode and ingest into the RAG pipeline (chunk + embed + Qdrant)
-    text = contents.decode("utf-8", errors="ignore")
+    # 2. Extract text depending on file type, then ingest into RAG pipeline
+    if file.filename.lower().endswith(".pdf"):
+        text = extract_pdf_text(contents)
+    else:
+        text = contents.decode("utf-8", errors="ignore")
+
     chunk_count = ingest_text(text, source_name=file.filename)
 
     return {
@@ -97,3 +104,11 @@ async def upload_document_endpoint(file: UploadFile = File(...)):
 @app.get("/documents")
 async def list_documents_endpoint():
     return {"documents": list_documents()}
+
+
+@app.delete("/documents/{filename}")
+async def delete_document_endpoint(filename: str):
+    storage_key = f"documents/{filename}"
+    delete_document(storage_key)
+    delete_by_source(filename)
+    return {"deleted": filename}

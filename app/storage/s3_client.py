@@ -60,3 +60,10 @@ def list_documents() -> list[str]:
         Bucket=settings.r2_bucket_name, Prefix="documents/"
     )
     return [obj["Key"] for obj in response.get("Contents", [])]
+
+
+def delete_document(key: str):
+    """Deletes a document from cloud storage."""
+    settings = get_settings()
+    client = get_s3_client()
+    client.delete_object(Bucket=settings.r2_bucket_name, Key=key)
