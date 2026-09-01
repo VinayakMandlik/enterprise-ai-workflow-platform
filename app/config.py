@@ -1,5 +1,6 @@
 import os
 from functools import lru_cache
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -12,6 +13,9 @@ class Settings(BaseSettings):
 
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
     groq_model: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -36,14 +40,19 @@ class Settings(BaseSettings):
     qdrant_collection: str = os.getenv("QDRANT_COLLECTION", "enterprise_docs")
 
     # ---- Tracing ----
-    langsmith_enabled: bool = os.getenv("LANGSMITH_TRACING", "false").lower() == "true"
-    langsmith_api_key: str = os.getenv("LANGCHAIN_API_KEY", "")
-    langsmith_project: str = os.getenv("LANGCHAIN_PROJECT", "enterprise-ai-workflow")
+    # These three use Field(alias=...) instead of os.getenv() because
+    # os.getenv() only sees REAL OS environment variables, evaluated
+    # once at class-definition time — it never sees values loaded from
+    # the .env file. Field(alias=...) lets Pydantic itself read these
+    # from .env correctly, matching env var names that differ from the
+    # Python field names below.
+    langsmith_enabled: bool = Field(default=False, alias="LANGSMITH_TRACING")
+    langsmith_api_key: str = Field(default="", alias="LANGCHAIN_API_KEY")
+    langsmith_project: str = Field(default="enterprise-ai-workflow", alias="LANGCHAIN_PROJECT")
 
     # ---- Memory persistence ----
     memory_backend: str = os.getenv("MEMORY_BACKEND", "sqlite")
     memory_db_path: str = os.getenv("MEMORY_DB_PATH", "./data/memory.db")
-
 
     # ---- Cloud document storage (Supabase Storage, S3-compatible API) ----
     r2_endpoint_url: str = os.getenv("R2_ENDPOINT_URL", "")
@@ -55,6 +64,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         extra = "ignore"
+        populate_by_name = True
 
 
 @lru_cache

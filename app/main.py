@@ -3,6 +3,7 @@ FastAPI entrypoint.
 
 Run with:  uvicorn app.main:app --reload
 """
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File
 from fastapi.staticfiles import StaticFiles
@@ -10,6 +11,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
 
+from app.config import get_settings
 from app.mcp.tool_client import load_mcp_tools
 from app.agents.graph import build_graph, run_intake_agent, run_scheduled_digest_agent
 from app.memory.long_term import get_long_term_memory
@@ -17,12 +19,23 @@ from app.storage.s3_client import upload_document, list_documents, delete_docume
 from app.rag.ingest import ingest_text, extract_pdf_text
 from app.rag.vector_store import delete_by_source
 from app.scheduler import start_scheduler, stop_scheduler
+from app.providers import extract_text
 
 _state = {}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = get_settings()
+
+    # Optional LangSmith tracing — env-gated, so it's a zero-code-change
+    # toggle. When enabled, every LLM call, tool call, and graph step
+    # gets logged to a visual trace at smith.langchain.com.
+    if settings.langsmith_enabled:
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_API_KEY"] = settings.langsmith_api_key
+        os.environ["LANGCHAIN_PROJECT"] = settings.langsmith_project
+
     # Runs once when the server starts: connect to the MCP server,
     # discover tools, and build the LangGraph agent — all reused
     # across every incoming request.
@@ -70,7 +83,7 @@ async def run_workflow(req: WorkflowRequest):
         config=config,
     )
     final_message = result["messages"][-1]
-    return WorkflowResponse(response=final_message.content, route=result.get("route", "general"))
+    return WorkflowResponse(response=extract_text(final_message), route=result.get("route", "general"))
 
 
 @app.get("/memory/{user_id}")

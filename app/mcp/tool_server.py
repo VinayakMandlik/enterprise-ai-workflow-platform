@@ -55,8 +55,9 @@ def summarize_text(text: str) -> str:
     """Summarize an arbitrary chunk of enterprise document text."""
     from app.providers import get_llm
     llm = get_llm()
+    from app.providers import extract_text
     resp = llm.invoke(f"Summarize the following in 3 bullet points:\n\n{text}")
-    return resp.content
+    return extract_text(resp)
 
 
 @mcp.tool()

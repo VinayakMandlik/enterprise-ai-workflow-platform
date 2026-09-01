@@ -26,3 +26,4 @@ pypdf>=5.0
 
 # Scheduled Agent
 apscheduler>=3.10
+langchain-google-genai>=2.0

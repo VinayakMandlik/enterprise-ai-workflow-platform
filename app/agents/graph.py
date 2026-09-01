@@ -10,7 +10,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, AIMessage
 
-from app.providers import get_llm
+from app.providers import get_llm, extract_text
 from app.memory.long_term import get_long_term_memory
 
 
@@ -39,7 +39,7 @@ def build_router_node():
         decision = llm.invoke(
             [SystemMessage(content=ROUTER_SYSTEM_PROMPT), HumanMessage(content=last_user_msg)]
         )
-        route = decision.content.strip().lower()
+        route = extract_text(decision).strip().lower()
         if route not in ("knowledge_query", "system_lookup", "general"):
             route = "general"
         return {"messages": [], "route": route, "user_id": state["user_id"]}
@@ -80,6 +80,9 @@ def build_critic_node():
     llm = get_llm()
 
     def critic(state: WorkflowState) -> WorkflowState:
+        if state["route"] == "general":
+            return {}
+
         last_ai_msg = next(
             (m for m in reversed(state["messages"]) if isinstance(m, AIMessage)), None
         )
@@ -96,12 +99,12 @@ def build_critic_node():
 "{user_question.content}"
 
 An AI assistant answered:
-"{last_ai_msg.content}"
+"{extract_text(last_ai_msg)}"
 
 Does this answer actually address the question, directly and clearly?
 Respond with only "APPROVED" or "NEEDS_REVISION: <brief reason>"."""
 
-        verdict = llm.invoke([HumanMessage(content=review_prompt)]).content.strip()
+        verdict = extract_text(llm.invoke([HumanMessage(content=review_prompt)])).strip()
 
         # Store the verdict as metadata for now — later this could trigger
         # a real retry loop back to the agent node.
@@ -120,7 +123,7 @@ def build_memory_writer_node():
             memory.remember(
                 user_id=state["user_id"],
                 key="last_interaction",
-                value={"summary": last_ai_msg.content[:500]},
+                value={"summary": extract_text(last_ai_msg)[:500]},
             )
         return {}
 
@@ -179,15 +182,16 @@ Document content:
 {text[:4000]}"""
 
     response = llm.invoke([HumanMessage(content=intake_prompt)])
+    analysis_text = extract_text(response)
 
     memory = get_long_term_memory()
     memory.remember(
         user_id=user_id,
         key=f"document_intake:{filename}",
-        value={"filename": filename, "analysis": response.content},
+        value={"filename": filename, "analysis": analysis_text},
     )
 
-    return {"filename": filename, "analysis": response.content}
+    return {"filename": filename, "analysis": analysis_text}
 
 
 def run_scheduled_digest_agent(user_id: str = "demo-user") -> dict:
@@ -239,7 +243,7 @@ the knowledge base:
 {combined[:6000]}
 
 Write a brief consolidated daily digest highlighting anything notable."""
-        digest = llm.invoke(digest_prompt).content
+        digest = extract_text(llm.invoke(digest_prompt))
 
     memory.remember(user_id=user_id, key="daily_digest", value={"digest": digest})
     return {"digest": digest}
