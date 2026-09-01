@@ -62,6 +62,14 @@ class LongTermMemory:
         ).fetchall()
         return {k: json.loads(v) for k, v in rows}
 
+    def forget(self, user_id: str, key: str):
+        """Deletes a specific memory entry."""
+        self._conn.execute(
+            "DELETE FROM memories WHERE user_id = ? AND key = ?",
+            (user_id, key),
+        )
+        self._conn.commit()
+
 
 _singleton: LongTermMemory | None = None
 

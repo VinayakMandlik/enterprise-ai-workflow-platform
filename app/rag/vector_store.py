@@ -71,3 +71,32 @@ def delete_by_source(source_name: str):
             must=[FieldCondition(key="metadata.source", match=MatchValue(value=source_name))]
         ),
     )
+
+
+def list_all_sources() -> list[str]:
+    """
+    Returns every distinct 'source' filename currently indexed in
+    Qdrant — the true list of what's actually searchable, regardless
+    of how it got there. Used by the document list endpoint and by
+    the digest agent to self-heal against stale memory entries.
+    """
+    settings = get_settings()
+    store = get_vector_store()
+
+    all_sources = set()
+    offset = None
+    while True:
+        points, offset = store.client.scroll(
+            collection_name=settings.qdrant_collection,
+            with_payload=True,
+            limit=100,
+            offset=offset,
+        )
+        for point in points:
+            source = point.payload.get("metadata", {}).get("source")
+            if source:
+                all_sources.add(source)
+        if offset is None:
+            break
+
+    return sorted(all_sources)

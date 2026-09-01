@@ -107,7 +107,7 @@
     max-height: 260px;
     overflow-y: auto;
   }
-    .doc-item {
+  .doc-item {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -143,6 +143,18 @@
     transition: all 0.2s ease;
   }
   .clear-btn:hover { background: rgba(248,113,113,0.15); }
+
+  .digest-btn {
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(52,211,153,0.3);
+    background: rgba(52,211,153,0.08);
+    color: #6ee7b7;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .digest-btn:hover { background: rgba(52,211,153,0.15); }
 
   /* MAIN PANEL */
   .main {
@@ -257,8 +269,18 @@
   .copy-btn:hover { background: rgba(167,139,250,0.25); color: white; }
 
   .route-tag {
-    display: inline-block; font-size: 0.62rem; opacity: 0.5;
-    margin-top: 6px; text-transform: uppercase; letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.68rem;
+    margin-top: 8px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(167,139,250,0.12);
+    border: 1px solid rgba(167,139,250,0.25);
+    color: #c4b5fd;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
   .typing {
@@ -308,6 +330,7 @@
     </div>
     <div class="upload-status" id="uploadStatus"></div>
     <div class="doc-list" id="docList"></div>
+    <button class="digest-btn" id="digestBtn">📊 Run Daily Digest</button>
     <button class="clear-btn" id="clearBtn">🗑️ Clear conversation</button>
   </aside>
 
@@ -321,7 +344,7 @@
     <div class="chat-window" id="chatWindow">
       <div class="msg-row bot">
         <div class="avatar bot">🤖</div>
-        <div class="msg">👋 Hi! Ask me anything — I can look up documents, check report statuses, or just chat.</div>
+        <div class="msg">👋 Hi! Ask me anything — I can look up documents, check report statuses, do deep research, draft documents, or just chat.</div>
       </div>
     </div>
 
@@ -344,6 +367,7 @@
   const uploadStatus = document.getElementById('uploadStatus');
   const docList = document.getElementById('docList');
   const clearBtn = document.getElementById('clearBtn');
+  const digestBtn = document.getElementById('digestBtn');
 
   const userId = 'web-user';
   let threadId = 'web-thread-' + Date.now();
@@ -388,7 +412,7 @@
     msg.className = 'msg';
 
     if (sender === 'bot') {
-      msg.innerHTML = renderMarkdown(text) + (route ? `<span class="route-tag">${route}</span>` : '');
+      msg.innerHTML = renderMarkdown(text) + (route ? `<span class="route-tag">🏷️ ${route}</span>` : '');
     } else {
       msg.textContent = text;
     }
@@ -446,6 +470,20 @@
     chatWindow.innerHTML = `<div class="msg-row bot"><div class="avatar bot">🤖</div><div class="msg">👋 New conversation started. Ask me anything!</div></div>`;
   });
 
+  digestBtn.addEventListener('click', async () => {
+    addMessage("Running the Scheduled Digest Agent now...", 'user');
+    showTyping();
+    try {
+      const res = await fetch(`/agents/digest?user_id=${userId}`, { method: 'POST' });
+      const data = await res.json();
+      hideTyping();
+      addMessage(`📊 **Scheduled Digest Agent**:\n\n${data.digest}`, 'bot');
+    } catch (err) {
+      hideTyping();
+      addMessage('⚠️ Digest failed: ' + err.message, 'bot');
+    }
+  });
+
   // upload handling
   uploadZone.addEventListener('click', () => fileInput.click());
   uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
@@ -465,10 +503,16 @@
     formData.append('file', file);
 
     try {
-      const res = await fetch('/documents/upload', { method: 'POST', body: formData });
+      const res = await fetch('/documents/upload?user_id=' + userId, { method: 'POST', body: formData });
       const data = await res.json();
       uploadStatus.textContent = `✅ ${data.chunks_ingested} chunk(s) indexed`;
       loadDocuments();
+
+      // Show what the Document Intake Agent found, right in the chat
+      addMessage(
+        `📥 **Document Intake Agent** analyzed "${data.filename}":\n\n${data.intake_analysis}`,
+        'bot'
+      );
     } catch (err) {
       uploadStatus.textContent = `⚠️ Upload failed: ${err.message}`;
     }
@@ -498,10 +542,10 @@
   }
 
   async function deleteDocument(filename) {
-    if (!confirm(`Delete "${filename}"? This removes it from storage and search.`)) return;
+    if (!confirm(`Delete "${filename}"? This removes it from storage, search, and memory.`)) return;
 
     try {
-      await fetch(`/documents/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+      await fetch(`/documents/${encodeURIComponent(filename)}?user_id=${userId}`, { method: 'DELETE' });
       loadDocuments();
     } catch (err) {
       alert('Failed to delete: ' + err.message);

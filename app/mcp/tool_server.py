@@ -59,5 +59,72 @@ def summarize_text(text: str) -> str:
     return resp.content
 
 
+@mcp.tool()
+def draft_document(purpose: str, key_points: str) -> str:
+    """
+    Task/Action Agent tool: drafts a real deliverable (email, memo,
+    summary document) based on a stated purpose and key points to
+    include. Use this when the user wants something WRITTEN for them,
+    not just information retrieved.
+    """
+    from app.providers import get_llm
+    llm = get_llm()
+    prompt = f"""Draft a professional, well-formatted document for this purpose:
+"{purpose}"
+
+Key points to include:
+{key_points}
+
+Write the complete draft, ready to send/use as-is."""
+    resp = llm.invoke(prompt)
+    return resp.content
+
+
+@mcp.tool()
+def deep_research(topic: str, max_searches: int = 3) -> str:
+    """
+    Research Agent tool: performs MULTIPLE searches with different
+    phrasings across the knowledge base, then synthesizes a combined
+    report — for questions that need cross-referencing multiple
+    documents rather than a single lookup. Use this for broad or
+    exploratory questions like "what has changed" or "summarize
+    everything about X across our documents".
+    """
+    from app.providers import get_llm
+
+    llm = get_llm()
+    retriever = get_retriever(k=4)
+
+    # Step 1: generate several different search phrasings for the topic
+    query_gen_prompt = f"""Generate {max_searches} different, specific search
+queries to thoroughly research this topic: "{topic}"
+Respond with ONLY the queries, one per line, no numbering."""
+    queries_raw = llm.invoke(query_gen_prompt).content
+    queries = [q.strip() for q in queries_raw.split("\n") if q.strip()][:max_searches]
+
+    # Step 2: run each search and collect results
+    all_findings = []
+    for q in queries:
+        docs = retriever.invoke(q)
+        for d in docs:
+            all_findings.append(f"[source: {d.metadata.get('source', 'unknown')}]\n{d.page_content}")
+
+    if not all_findings:
+        return "No relevant information found across any searches."
+
+    combined = "\n\n---\n\n".join(all_findings)
+
+    # Step 3: synthesize a single report from all findings
+    synthesis_prompt = f"""Based on the following retrieved information,
+write a clear, well-organized research summary about: "{topic}"
+
+Retrieved information:
+{combined[:6000]}
+
+Write a synthesized report, citing sources where relevant."""
+    report = llm.invoke(synthesis_prompt).content
+    return report
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")
